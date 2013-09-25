@@ -19,7 +19,7 @@ namespace PPT_To_Latex
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
 
             bool includeHidden = false;
-            string pptxfilename = "test2.pptx";
+            string pptxfilename = "test3.pptx";
             string latexfilename = "test.tex";
 
             using (PresentationDocument presentationDocument = PresentationDocument.Open(pptxfilename, false))
@@ -29,7 +29,7 @@ namespace PPT_To_Latex
 
                 //Count slides
                 Console.WriteLine("Slides counts={0}", SlidesCount(includeHidden, presentationPart));
-
+                int imindex = 0;
                 var fileresult = File.CreateText(latexfilename);
 
                 foreach (SlideId slideId in presentation.SlideIdList)
@@ -41,7 +41,7 @@ namespace PPT_To_Latex
                     if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader)
                     {
                         Debug.WriteLine("%%%%%%%%%%NEWSECTION%%%%%%%%%%%%");
-                        fileresult.WriteLine(@"\section{"+ GetSlideTitle(slide) + "}" );
+                        fileresult.WriteLine(@"\section{" + GetSlideTitle(slide) + "}");
                         fileresult.WriteLine();
                     }
 
@@ -54,7 +54,7 @@ namespace PPT_To_Latex
 
                     fileresult.WriteLine();
                     fileresult.WriteLine(@"\begin{frame}");
-                    fileresult.WriteLine(@"\frametitle{"+ paragraphTexttit+"}");
+                    fileresult.WriteLine(@"\frametitle{" + paragraphTexttit + "}");
                     fileresult.WriteLine();
 
                     int previndent = 0;
@@ -63,7 +63,7 @@ namespace PPT_To_Latex
                     {
                         //http://msdn.microsoft.com/en-us/library/ee922775(v=office.14).aspx
                         int currentIndentLevel = 0;
-                        
+
                         if (paragraph.ParagraphProperties != null)
                         {
                             if (paragraph.ParagraphProperties.HasAttributes)
@@ -80,73 +80,75 @@ namespace PPT_To_Latex
                             }
 
                         }
-                        
+
                         StringBuilder paragraphText = new StringBuilder();
                         // Iterate through the lines of the paragraph.
                         foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
                         {
 
                             
-                            paragraphText.Append(text.Text);
+                                paragraphText.Append(text.Text);
                         }
 
                         if (paragraphText.Length > 0)
                         {
                             if (firstitemdone == false)
                             {
-                                WriteWithIndent(fileresult,@"\begin{itemize}[<+->]", currentIndentLevel);
+                                WriteWithIndent(fileresult, @"\begin{itemize}[<+->]", currentIndentLevel);
                                 firstitemdone = true;
                             }
                             if (previndent > currentIndentLevel)
                             {
-                                WriteWithIndent(fileresult, @"\end{itemize}", currentIndentLevel+1);
+                                WriteWithIndent(fileresult, @"\end{itemize}", currentIndentLevel + 1);
                             }
                             else if (previndent < currentIndentLevel)
                             {
                                 WriteWithIndent(fileresult, @"\begin{itemize}[<+->]", currentIndentLevel);
 
                             }
-                            WriteWithIndent(fileresult, @"\item " + paragraphText, currentIndentLevel);
+                           if (!paragraphText.ToString().Contains(@"artesis 20")) //TODO: this could be added as external input (e.g. filter file/blacklist)
+                                WriteWithIndent(fileresult, @"\item " + paragraphText, currentIndentLevel);
                             Debug.WriteLine(paragraphText.ToString());
                         }
                         previndent = currentIndentLevel;
                     }
-                  
+
                     //Get all images
-                    int imindex = 0;
+                   
                     foreach (var pic in slide.Slide.Descendants<Picture>())
                     {
-                        // First, get relationship id of image
-                        string rId = pic.BlipFill.Blip.Embed.Value;
+                        try
+                        {
+                            // First, get relationship id of image
+                            string rId = pic.BlipFill.Blip.Embed.Value;
+                            
+                            ImagePart imagePart = (ImagePart) slide.GetPartById(rId);
 
-                        ImagePart imagePart = (ImagePart)slide.GetPartById(rId);
+                            // Get the original file name.
+                            Debug.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
+                            string extension = "bmp";
+                            if (imagePart.ContentType.Contains("jpeg") || imagePart.ContentType.Contains("jpg"))
+                                extension = "jpg";
+                            else if (imagePart.ContentType.Contains("png"))
+                                extension = "png";
+                            imindex++;
+                            fileresult.WriteLine(@"\begin{figure}[h] \begin{center}");
+                            fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + "image" + imindex +
+                                                 "." + extension + "}");
+                            fileresult.WriteLine(@"\end{center} \end{figure}");
 
-                        // Get the original file name.
-                        Debug.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
-                        string extension = "bmp";
-                        if (imagePart.ContentType.Contains("jpeg") || imagePart.ContentType.Contains("jpg"))
-                            extension = "jpg";
-                        else if (imagePart.ContentType.Contains("png"))
-                            extension = "png";
-                        imindex++;
-                        fileresult.WriteLine(@"\begin{figure}[h] \begin{center}");
-                        fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + "image" + imindex+"."+ extension+ "}");
-                        fileresult.WriteLine(@"\end{center} \end{figure}"); 
-                        
-                        // Get the content type (e.g. image/jpeg).
-                        // Console.Out.WriteLine("content-type: {0}", imagePart.ContentType);
-
-                        // GetStream() returns the image data
-                         System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
-                        
-                        // You could save the image to disk using the System.Drawing.Image class
-                         img.Save("image" + imindex + "." + extension); 
+                            System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
+                            img.Save("image" + imindex + "." + extension);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("Error with an image");
+                        }
                     }
 
                     if (firstitemdone == true)
                     {
                         fileresult.WriteLine(@"\end{itemize}");
-                        
                     }
 
                     fileresult.WriteLine(@"\end{frame}");
@@ -155,17 +157,17 @@ namespace PPT_To_Latex
             }
         }
 
-        private static void WriteWithIndent(StreamWriter fileresult,string stringtowrite, int indentlevel)
+        private static void WriteWithIndent(StreamWriter fileresult, string stringtowrite, int indentlevel)
         {
             if (indentlevel < 0)
                 indentlevel = 0;
-            StringBuilder sb= new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             for (int i = 0; i < indentlevel; i++)
             {
                 sb.Append("\t");
             }
             sb.Append(stringtowrite);
-            
+
             fileresult.WriteLine(sb.ToString());
         }
 
