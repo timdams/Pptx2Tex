@@ -36,7 +36,8 @@ namespace PPT_To_Latex
 
                     SlidePart slide = (SlidePart)presentation.PresentationPart.GetPartById(relId);
 
-                
+                    if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.Title || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.TitleOnly)
+                        Console.WriteLine("%%%%%%%%%%NEWSECTION%%%%%%%%%%%%");
                     Console.WriteLine("\n\n\n********************************");
                     //Get title
                     var paragraphTexttit = GetSlideTitle(slide);
