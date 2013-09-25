@@ -14,8 +14,6 @@ namespace PPT_To_Latex
     {
         static void Main(string[] args)
         {
-            // http://stackoverflow.com/questions/7070074/how-can-i-retrieve-images-from-a-pptx-file-using-ms-open-xml-sdk
-
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
             bool includeHidden = false;
 
@@ -38,6 +36,8 @@ namespace PPT_To_Latex
 
                     if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.Title || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.TitleOnly)
                         Console.WriteLine("%%%%%%%%%%NEWSECTION%%%%%%%%%%%%");
+                    
+                    
                     Console.WriteLine("\n\n\n********************************");
                     //Get title
                     var paragraphTexttit = GetSlideTitle(slide);
