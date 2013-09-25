@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,18 +17,20 @@ namespace PPT_To_Latex
         static void Main(string[] args)
         {
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
+
             bool includeHidden = false;
+            string pptxfilename = "test2.pptx";
+            string latexfilename = "test.tex";
 
-
-            using (PresentationDocument presentationDocument = PresentationDocument.Open("test2.pptx", false))
+            using (PresentationDocument presentationDocument = PresentationDocument.Open(pptxfilename, false))
             {
-                PresentationPart presentationPart = presentationDocument.PresentationPart;
+                var presentationPart = presentationDocument.PresentationPart;
+                var presentation = presentationPart.Presentation;
 
                 //Count slides
-                Console.WriteLine("Slides counts={0}",  SlidesCount(includeHidden, presentationPart));
+                Console.WriteLine("Slides counts={0}", SlidesCount(includeHidden, presentationPart));
 
-                Presentation presentation = presentationPart.Presentation;
-
+                var fileresult = File.CreateText(latexfilename);
 
                 foreach (SlideId slideId in presentation.SlideIdList)
                 {
@@ -34,22 +38,32 @@ namespace PPT_To_Latex
 
                     SlidePart slide = (SlidePart)presentation.PresentationPart.GetPartById(relId);
 
-                    if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.Title || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader || slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.TitleOnly)
-                        Console.WriteLine("%%%%%%%%%%NEWSECTION%%%%%%%%%%%%");
-                    
-                    
-                    Console.WriteLine("\n\n\n********************************");
+                    if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader)
+                    {
+                        Debug.WriteLine("%%%%%%%%%%NEWSECTION%%%%%%%%%%%%");
+                        fileresult.WriteLine(@"\section{"+ GetSlideTitle(slide) + "}" );
+                        fileresult.WriteLine();
+                    }
+
+
+                    Debug.WriteLine("\n\n\n********************************");
                     //Get title
                     var paragraphTexttit = GetSlideTitle(slide);
-                    Console.WriteLine("\t\t" + paragraphTexttit.ToString());
-                    Console.WriteLine("----------------------");
+                    Debug.WriteLine("\t\t" + paragraphTexttit.ToString());
+                    Debug.WriteLine("----------------------");
 
-               
+                    fileresult.WriteLine();
+                    fileresult.WriteLine(@"\begin{frame}");
+                    fileresult.WriteLine(@"\frametitle{"+ paragraphTexttit+"}");
+                    fileresult.WriteLine();
 
+                    int previndent = 0;
+                    bool firstitemdone = false;
                     foreach (var paragraph in slide.Slide.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>().Skip(1))
                     {
                         //http://msdn.microsoft.com/en-us/library/ee922775(v=office.14).aspx
-                        int indentevel = 0;
+                        int currentIndentLevel = 0;
+                        
                         if (paragraph.ParagraphProperties != null)
                         {
                             if (paragraph.ParagraphProperties.HasAttributes)
@@ -57,37 +71,47 @@ namespace PPT_To_Latex
                                 try
                                 {
                                     string lvl = paragraph.ParagraphProperties.GetAttribute("lvl", "").Value;
-                                    indentevel = int.Parse(lvl);
-
+                                    currentIndentLevel = int.Parse(lvl);
                                 }
                                 catch
                                 {
                                     //Ignore
                                 }
-                            }            
-                           
+                            }
+
                         }
+                        
                         StringBuilder paragraphText = new StringBuilder();
                         // Iterate through the lines of the paragraph.
                         foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
                         {
+
                             
-                            // Append each line to the previous lines.
-                            for (int i = 0; i < indentevel; i++)
-                            {
-                                paragraphText.Append("\t");
-                            }
                             paragraphText.Append(text.Text);
                         }
 
                         if (paragraphText.Length > 0)
                         {
-                            // Add each paragraph to the linked list.
-                            Console.WriteLine(paragraphText.ToString());
-                        }
-                      
-                    }
+                            if (firstitemdone == false)
+                            {
+                                WriteWithIndent(fileresult,@"\begin{itemize}[<+->]", currentIndentLevel);
+                                firstitemdone = true;
+                            }
+                            if (previndent > currentIndentLevel)
+                            {
+                                WriteWithIndent(fileresult, @"\end{itemize}", currentIndentLevel+1);
+                            }
+                            else if (previndent < currentIndentLevel)
+                            {
+                                WriteWithIndent(fileresult, @"\begin{itemize}[<+->]", currentIndentLevel);
 
+                            }
+                            WriteWithIndent(fileresult, @"\item " + paragraphText, currentIndentLevel);
+                            Debug.WriteLine(paragraphText.ToString());
+                        }
+                        previndent = currentIndentLevel;
+                    }
+                  
                     //Get all images
                     foreach (var pic in slide.Slide.Descendants<Picture>())
                     {
@@ -107,8 +131,31 @@ namespace PPT_To_Latex
                         // You could save the image to disk using the System.Drawing.Image class
                         //  img.Save(@"c:\temp\temp.jpg"); 
                     }
+
+                    if (firstitemdone == true)
+                    {
+                        fileresult.WriteLine(@"\end{itemize}");
+                        
+                    }
+
+                    fileresult.WriteLine(@"\end{frame}");
                 }
+                fileresult.Close();
             }
+        }
+
+        private static void WriteWithIndent(StreamWriter fileresult,string stringtowrite, int indentlevel)
+        {
+            if (indentlevel < 0)
+                indentlevel = 0;
+            StringBuilder sb= new StringBuilder();
+            for (int i = 0; i < indentlevel; i++)
+            {
+                sb.Append("\t");
+            }
+            sb.Append(stringtowrite);
+            
+            fileresult.WriteLine(sb.ToString());
         }
 
         private static StringBuilder GetSlideTitle(SlidePart slide)
