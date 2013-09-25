@@ -20,81 +20,62 @@ namespace PPT_To_Latex
             bool includeHidden = false;
 
 
-            using (PresentationDocument presentationDocument = PresentationDocument.Open("test.pptx", false))
+            using (PresentationDocument presentationDocument = PresentationDocument.Open("test2.pptx", false))
             {
                 PresentationPart presentationPart = presentationDocument.PresentationPart;
 
                 //Count slides
-                int slidesCount = 0;
-                if (includeHidden)
-                {
-                    slidesCount = presentationPart.SlideParts.Count();
-                }
-                else
-                {
-                    var slides = presentationPart.SlideParts.Where((s) => (s.Slide != null) && ((s.Slide.Show == null) || (s.Slide.Show.HasValue && s.Slide.Show.Value)));
-                    slidesCount = slides.Count();
-                }
-                Console.WriteLine("Slides counts={0}", slidesCount);
+                Console.WriteLine("Slides counts={0}",  SlidesCount(includeHidden, presentationPart));
 
                 Presentation presentation = presentationPart.Presentation;
 
 
-
-
-
-
-
-
-
                 foreach (SlideId slideId in presentation.SlideIdList)
-
-                // foreach (var slide in presentationPart.SlideParts)
                 {
-
                     String relId = slideId.RelationshipId.Value;
 
                     SlidePart slide = (SlidePart)presentation.PresentationPart.GetPartById(relId);
-                    // Perform actions on SlidePart.
 
                 
                     Console.WriteLine("\n\n\n********************************");
                     //Get title
-                    var shapes = from shape in slide.Slide.Descendants<Shape>()
-                                 where IsTitleShape(shape)
-                                 select shape;
-                    StringBuilder paragraphTexttit = new StringBuilder();
-                    string paragraphSeparator = null;
-                    foreach (var shape in shapes)
-                    {
-                        // Get the text in each paragraph in this shape.
-                        foreach (var paragraph in shape.TextBody.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>())
-                        {
-                            // Add a line break.
-                            paragraphTexttit.Append(paragraphSeparator);
-
-                            foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
-                            {
-                                paragraphTexttit.Append(text.Text);
-                            }
-
-                            paragraphSeparator = "\n";
-                        }
-                    }
+                    var paragraphTexttit = GetSlideTitle(slide);
                     Console.WriteLine("\t\t" + paragraphTexttit.ToString());
                     Console.WriteLine("----------------------");
 
-                    //GEt all text
+               
 
-                    foreach (var paragraph in slide.Slide.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>())
+                    foreach (var paragraph in slide.Slide.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>().Skip(1))
                     {
-                        // Create a new string builder.                    
-                        StringBuilder paragraphText = new StringBuilder();
+                        //http://msdn.microsoft.com/en-us/library/ee922775(v=office.14).aspx
+                        int indentevel = 0;
+                        if (paragraph.ParagraphProperties != null)
+                        {
+                            if (paragraph.ParagraphProperties.HasAttributes)
+                            {
+                                try
+                                {
+                                    string lvl = paragraph.ParagraphProperties.GetAttribute("lvl", "").Value;
+                                    indentevel = int.Parse(lvl);
 
+                                }
+                                catch
+                                {
+                                    //Ignore
+                                }
+                            }            
+                           
+                        }
+                        StringBuilder paragraphText = new StringBuilder();
                         // Iterate through the lines of the paragraph.
                         foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
                         {
+                            
                             // Append each line to the previous lines.
+                            for (int i = 0; i < indentevel; i++)
+                            {
+                                paragraphText.Append("\t");
+                            }
                             paragraphText.Append(text.Text);
                         }
 
@@ -103,6 +84,7 @@ namespace PPT_To_Latex
                             // Add each paragraph to the linked list.
                             Console.WriteLine(paragraphText.ToString());
                         }
+                      
                     }
 
                     //Get all images
@@ -124,10 +106,53 @@ namespace PPT_To_Latex
                         // You could save the image to disk using the System.Drawing.Image class
                         //  img.Save(@"c:\temp\temp.jpg"); 
                     }
-
                 }
             }
         }
+
+        private static StringBuilder GetSlideTitle(SlidePart slide)
+        {
+            var shapes = from shape in slide.Slide.Descendants<Shape>()
+                         where IsTitleShape(shape)
+                         select shape;
+            StringBuilder paragraphTexttit = new StringBuilder();
+            string paragraphSeparator = null;
+            foreach (var shape in shapes)
+            {
+                // Get the text in each paragraph in this shape.
+                foreach (var paragraph in shape.TextBody.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>())
+                {
+                    // Add a line break.
+                    paragraphTexttit.Append(paragraphSeparator);
+
+                    foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
+                    {
+                        paragraphTexttit.Append(text.Text);
+                    }
+
+                    paragraphSeparator = "\n";
+                }
+            }
+            return paragraphTexttit;
+        }
+
+        private static int SlidesCount(bool includeHidden, PresentationPart presentationPart)
+        {
+            int slidesCount = 0;
+            if (includeHidden)
+            {
+                slidesCount = presentationPart.SlideParts.Count();
+            }
+            else
+            {
+                var slides =
+                    presentationPart.SlideParts.Where(
+                        (s) => (s.Slide != null) && ((s.Slide.Show == null) || (s.Slide.Show.HasValue && s.Slide.Show.Value)));
+                slidesCount = slides.Count();
+            }
+            return slidesCount;
+        }
+
         // Determines whether the shape is a title shape.
         private static bool IsTitleShape(Shape shape)
         {
