@@ -113,6 +113,7 @@ namespace PPT_To_Latex
                     }
                   
                     //Get all images
+                    int imindex = 0;
                     foreach (var pic in slide.Slide.Descendants<Picture>())
                     {
                         // First, get relationship id of image
@@ -121,15 +122,25 @@ namespace PPT_To_Latex
                         ImagePart imagePart = (ImagePart)slide.GetPartById(rId);
 
                         // Get the original file name.
-                        Console.Out.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
+                        Debug.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
+                        string extension = "bmp";
+                        if (imagePart.ContentType.Contains("jpeg") || imagePart.ContentType.Contains("jpg"))
+                            extension = "jpg";
+                        else if (imagePart.ContentType.Contains("png"))
+                            extension = "png";
+                        imindex++;
+                        fileresult.WriteLine(@"\begin{figure}[h] \begin{center}");
+                        fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + "image" + imindex+"."+ extension+ "}");
+                        fileresult.WriteLine(@"\end{center} \end{figure}"); 
+                        
                         // Get the content type (e.g. image/jpeg).
                         // Console.Out.WriteLine("content-type: {0}", imagePart.ContentType);
 
                         // GetStream() returns the image data
-                        // System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
-
+                         System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
+                        
                         // You could save the image to disk using the System.Drawing.Image class
-                        //  img.Save(@"c:\temp\temp.jpg"); 
+                         img.Save("image" + imindex + "." + extension); 
                     }
 
                     if (firstitemdone == true)
