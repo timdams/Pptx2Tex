@@ -18,10 +18,15 @@ namespace PPT_To_Latex
         {
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
 
-            bool includeHidden = false;
-            string pptxfilename = "test3.pptx";
+            bool includeHidden = true;
+            string pptxfilename = "test2.pptx";
             string latexfilename = "test.tex";
 
+            ConvertPptx2Tex(pptxfilename, includeHidden, latexfilename);
+        }
+
+        private static void ConvertPptx2Tex(string pptxfilename, bool includeHidden, string latexfilename)
+        {
             using (PresentationDocument presentationDocument = PresentationDocument.Open(pptxfilename, false))
             {
                 var presentationPart = presentationDocument.PresentationPart;
@@ -29,14 +34,25 @@ namespace PPT_To_Latex
 
                 //Count slides
                 Console.WriteLine("Slides counts={0}", SlidesCount(includeHidden, presentationPart));
-                int imindex = 0;
+                int imageCount = 0;
                 var fileresult = File.CreateText(latexfilename);
 
                 foreach (SlideId slideId in presentation.SlideIdList)
                 {
+                   
+
+
                     String relId = slideId.RelationshipId.Value;
 
                     SlidePart slide = (SlidePart)presentation.PresentationPart.GetPartById(relId);
+                   
+                    if (!includeHidden) //check if we got hidden slide, of so, skip
+                    {
+                        if (slide.Slide.Show!=null &&  slide.Slide.Show.HasValue && slide.Slide.Show.Value == false)
+                            continue;
+                    }
+
+
 
                     if (slide.SlideLayoutPart.SlideLayout.Type == SlideLayoutValues.SectionHeader)
                     {
@@ -78,16 +94,13 @@ namespace PPT_To_Latex
                                     //Ignore
                                 }
                             }
-
                         }
 
                         StringBuilder paragraphText = new StringBuilder();
                         // Iterate through the lines of the paragraph.
                         foreach (var text in paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Text>())
                         {
-
-                            
-                                paragraphText.Append(text.Text);
+                            paragraphText.Append(text.Text);
                         }
 
                         if (paragraphText.Length > 0)
@@ -103,42 +116,35 @@ namespace PPT_To_Latex
                             }
                             else if (previndent < currentIndentLevel)
                             {
-                                WriteWithIndent(fileresult, @"\begin{itemize}[<+->]", currentIndentLevel);
-
+                                WriteWithIndent(fileresult, @"\begin{itemize}", currentIndentLevel);
                             }
-                           if (!paragraphText.ToString().Contains(@"artesis 20")) //TODO: this could be added as external input (e.g. filter file/blacklist)
+                            if (!paragraphText.ToString().Contains(@"artesis 20"))
+                                //TODO: this could be added as external input (e.g. filter file/blacklist)
                                 WriteWithIndent(fileresult, @"\item " + paragraphText, currentIndentLevel);
                             Debug.WriteLine(paragraphText.ToString());
                         }
                         previndent = currentIndentLevel;
                     }
 
-                    //Get all images
-                   
+                    //Get all the images!!! 
                     foreach (var pic in slide.Slide.Descendants<Picture>())
                     {
                         try
                         {
-                            // First, get relationship id of image
-                            string rId = pic.BlipFill.Blip.Embed.Value;
-                            
-                            ImagePart imagePart = (ImagePart) slide.GetPartById(rId);
+                            string extension;
 
-                            // Get the original file name.
-                            Debug.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
-                            string extension = "bmp";
-                            if (imagePart.ContentType.Contains("jpeg") || imagePart.ContentType.Contains("jpg"))
-                                extension = "jpg";
-                            else if (imagePart.ContentType.Contains("png"))
-                                extension = "png";
-                            imindex++;
+                            //Extract correct image part and extenion
+                            var imagePart = ExtractImage(pic, slide, out extension);
+
+                            //Write text item
+                            imageCount++;
+                            string imagefilename = string.Format("{0}{1}.{2}", "image", imageCount, extension);
                             fileresult.WriteLine(@"\begin{figure}[h] \begin{center}");
-                            fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + "image" + imindex +
-                                                 "." + extension + "}");
+                            fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + imagefilename + "}");
                             fileresult.WriteLine(@"\end{center} \end{figure}");
 
-                            System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
-                            img.Save("image" + imindex + "." + extension);
+                            //Save image to file
+                            WriteImageToFile(imagePart, imagefilename);
                         }
                         catch (Exception ex)
                         {
@@ -155,6 +161,29 @@ namespace PPT_To_Latex
                 }
                 fileresult.Close();
             }
+        }
+
+        private static void WriteImageToFile(ImagePart imagePart, string filename)
+        {
+            System.Drawing.Image img = System.Drawing.Image.FromStream(imagePart.GetStream());
+            img.Save(filename);
+        }
+
+        private static ImagePart ExtractImage(Picture pic, SlidePart slide, out string extension)
+        {
+            // First, get relationship id of image
+            string rId = pic.BlipFill.Blip.Embed.Value;
+
+            ImagePart imagePart = (ImagePart)slide.GetPartById(rId);
+
+            // Get the original file name.
+            Debug.WriteLine("$$Image:" + imagePart.Uri.OriginalString);
+            extension = "bmp";
+            if (imagePart.ContentType.Contains("jpeg") || imagePart.ContentType.Contains("jpg"))
+                extension = "jpg";
+            else if (imagePart.ContentType.Contains("png"))
+                extension = "png";
+            return imagePart;
         }
 
         private static void WriteWithIndent(StreamWriter fileresult, string stringtowrite, int indentlevel)
