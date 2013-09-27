@@ -19,7 +19,7 @@ namespace PPT_To_Latex
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
 
             bool includeHidden = true;
-            string pptxfilename = "test2.pptx";
+            string pptxfilename = "test5.pptx";
             string latexfilename = "test.tex";
 
             ConvertPptx2Tex(pptxfilename, includeHidden, latexfilename);
@@ -37,20 +37,24 @@ namespace PPT_To_Latex
                 int imageCount = 0;
                 var fileresult = File.CreateText(latexfilename);
 
+
+              
                 foreach (SlideId slideId in presentation.SlideIdList)
                 {
-                   
 
 
                     String relId = slideId.RelationshipId.Value;
 
                     SlidePart slide = (SlidePart)presentation.PresentationPart.GetPartById(relId);
-                   
+
                     if (!includeHidden) //check if we got hidden slide, of so, skip
                     {
-                        if (slide.Slide.Show!=null &&  slide.Slide.Show.HasValue && slide.Slide.Show.Value == false)
+                        if (slide.Slide.Show != null && slide.Slide.Show.HasValue && slide.Slide.Show.Value == false)
                             continue;
                     }
+
+                    //On equations: http://blogs.msdn.com/b/murrays/archive/2006/10/07/mathml-and-ecma-math-_2800_omml_2900_-.aspx && http://stackoverflow.com/questions/2300757/c-sharp-api-for-ms-word-equation-editor
+                    //Solution? http://stackoverflow.com/questions/16759100/how-to-parse-mathml-in-output-of-wordopenxml
 
 
 
@@ -75,8 +79,13 @@ namespace PPT_To_Latex
 
                     int previndent = 0;
                     bool firstitemdone = false;
+
+                    
+
                     foreach (var paragraph in slide.Slide.Descendants<DocumentFormat.OpenXml.Drawing.Paragraph>().Skip(1))
                     {
+
+
                         //http://msdn.microsoft.com/en-us/library/ee922775(v=office.14).aspx
                         int currentIndentLevel = 0;
 
@@ -160,7 +169,11 @@ namespace PPT_To_Latex
                     fileresult.WriteLine(@"\end{frame}");
                 }
                 fileresult.Close();
+
+
             }
+
+
         }
 
         private static void WriteImageToFile(ImagePart imagePart, string filename)
