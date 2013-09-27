@@ -19,7 +19,7 @@ namespace PPT_To_Latex
             // http://msdn.microsoft.com/en-us/library/bb448854.aspx
 
             bool includeHidden = true;
-            string pptxfilename = "test5.pptx";
+            string pptxfilename = "test2.pptx";
             string latexfilename = "test.tex";
 
             ConvertPptx2Tex(pptxfilename, includeHidden, latexfilename);
@@ -147,7 +147,7 @@ namespace PPT_To_Latex
 
                             //Write text item
                             imageCount++;
-                            string imagefilename = string.Format("{0}{1}.{2}", "image", imageCount, extension);
+                            string imagefilename = string.Format("{0}{1:00}.{2}", "image", imageCount, extension);
                             fileresult.WriteLine(@"\begin{figure}[h] \begin{center}");
                             fileresult.WriteLine("\t" + @"\includegraphics[width=0.5\textwidth]{" + imagefilename + "}");
                             fileresult.WriteLine(@"\end{center} \end{figure}");
